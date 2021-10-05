@@ -14,6 +14,13 @@ public class NetworkedServer : MonoBehaviour
     int hostID;
     int socketPort = 5491;
 
+    const string fileName = "AccountInfoSaveFile.txt";
+
+
+    const int PlayerAccountIdentifyer = 1;
+
+    private static LinkedList<PlayerAccount> accountInfo;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -23,6 +30,9 @@ public class NetworkedServer : MonoBehaviour
         unreliableChannelID = config.AddChannel(QosType.Unreliable);
         HostTopology topology = new HostTopology(config, maxConnections);
         hostID = NetworkTransport.AddHost(topology, socketPort, null);
+
+        accountInfo = new LinkedList<PlayerAccount>();
+        LoadPlayerAccounts();
         
     }
 
@@ -67,7 +77,131 @@ public class NetworkedServer : MonoBehaviour
     
     private void ProcessRecievedMsg(string msg, int id)
     {
-        Debug.Log("msg recieved = " + msg + ".  connection id = " + id);
+        Debug.Log("msg received = " + msg + ".  connection id = " + id);
+
+        string[] csv = msg.Split(',');
+        int signifier = int.Parse(csv[0]);
+
+        if (signifier == ClientToSeverSignifiers.CreateAccount)
+        {
+            string n = csv[1];
+            string p = csv[2];
+
+            bool isUnique = true;
+            foreach(PlayerAccount pa in accountInfo)
+            {
+                if (pa.userName == n)
+                {
+                    isUnique = false;
+                    break;
+                }
+            }
+            if (!isUnique)
+            {
+                SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameInUse, id);
+            }
+            else
+            {
+                accountInfo.AddLast(new PlayerAccount(n, p));
+                SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success, id);
+                SavePlayerAccounts();
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.Login)
+        {
+            string n = csv[1];
+            string p = csv[2];
+            bool hasBeenFound = false;
+
+            foreach (PlayerAccount pa in accountInfo)
+            {
+                if (pa.userName == n)
+                {
+                    if(pa.password == p)
+                    {
+                        SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success, id);
+                    }
+                    else
+                    {
+                        SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureIncorrectPassword, id);
+                        break;
+                    }
+                    hasBeenFound = true;
+                    break;
+                }
+
+            }
+            if (!hasBeenFound)
+                SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameNotFound, id);
+        }
+    }
+    static public void LoadPlayerAccounts()
+    {
+        string path = Application.dataPath + Path.DirectorySeparatorChar + fileName;
+        if (File.Exists(path))
+        {
+            StreamReader sr = new StreamReader(path);
+            string line = "";
+            while((line = sr.ReadLine()) != null)
+            {
+                string[] arr = line.Split(',');
+                int saveDataIdentifyer = int.Parse(arr[0]);
+                if (saveDataIdentifyer == PlayerAccountIdentifyer)
+                {
+                    PlayerAccount player = new PlayerAccount(arr[1], arr[2]);
+                    accountInfo.AddLast(player);
+                }
+            }
+            sr.Close();
+        }
+    }
+    static public void SavePlayerAccounts()
+    {
+        StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + fileName);
+        foreach (PlayerAccount player in accountInfo)
+        {
+            sw.WriteLine(PlayerAccountIdentifyer + "," + player.userName + "," + player.password);
+        }
+        sw.Close();
     }
 
+}
+public class PlayerAccount
+{
+    public string userName, password;
+    public PlayerAccount(string n, string p)
+    {
+        userName = n;
+        password = p;
+    }
+    static public bool operator==(PlayerAccount p1, PlayerAccount p2)
+    {
+        return (p1.userName == p2.userName && p1.password == p2.password);
+    }
+    static public bool operator !=(PlayerAccount p1, PlayerAccount p2)
+    {
+        return (p1.userName != p2.userName || p1.password != p2.password);
+    }
+}
+
+public static class ClientToSeverSignifiers
+{
+    public const int Login = 1;
+    public const int CreateAccount = 2;
+}
+
+public static class ServertoClientSignifiers
+{
+    public const int LoginResponse = 1;
+}
+
+public static class LoginResponse
+{
+    public const int Success = 1;
+
+    public const int FailureNameInUse = 2;
+
+    public const int FailureNameNotFound = 3;
+
+    public const int FailureIncorrectPassword = 4;
 }

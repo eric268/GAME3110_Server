@@ -12,7 +12,7 @@ public class NetworkedServer : MonoBehaviour
     int reliableChannelID;
     int unreliableChannelID;
     int hostID;
-    int socketPort = 5491;
+    int socketPort = 25565;
 
     const string fileName = "AccountInfoSaveFile.txt";
 
@@ -112,6 +112,7 @@ public class NetworkedServer : MonoBehaviour
             string n = csv[1];
             string p = csv[2];
             bool hasBeenFound = false;
+           
 
             foreach (PlayerAccount pa in accountInfo)
             {
@@ -120,10 +121,12 @@ public class NetworkedServer : MonoBehaviour
                     if(pa.password == p)
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success, id);
+                        
                     }
                     else
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureIncorrectPassword, id);
+                        
                         break;
                     }
                     hasBeenFound = true;
@@ -133,7 +136,7 @@ public class NetworkedServer : MonoBehaviour
             }
             if (!hasBeenFound)
                 SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameNotFound, id);
-        }
+            }
     }
     static public void LoadPlayerAccounts()
     {
@@ -204,4 +207,10 @@ public static class LoginResponse
     public const int FailureNameNotFound = 3;
 
     public const int FailureIncorrectPassword = 4;
+}
+
+public class GameSession
+{
+    //Hold two clients
+    //to do work list
 }

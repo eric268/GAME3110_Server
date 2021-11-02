@@ -16,7 +16,8 @@ public class NetworkedServer : MonoBehaviour
 
     const string fileName = "AccountInfoSaveFile.txt";
 
-
+    LinkedList<GameSession> gameSessions;
+    int playerWaitingForMatch = -1;
     const int PlayerAccountIdentifyer = 1;
 
     private static LinkedList<PlayerAccount> accountInfo;
@@ -32,6 +33,7 @@ public class NetworkedServer : MonoBehaviour
         hostID = NetworkTransport.AddHost(topology, socketPort, null);
 
         accountInfo = new LinkedList<PlayerAccount>();
+        gameSessions = new LinkedList<GameSession>();
         LoadPlayerAccounts();
         
     }
@@ -137,6 +139,38 @@ public class NetworkedServer : MonoBehaviour
             if (!hasBeenFound)
                 SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameNotFound, id);
             }
+        else if (signifier == ClientToSeverSignifiers.AddToGameSessionQueue)
+        {
+            if (playerWaitingForMatch == -1)
+            {
+                playerWaitingForMatch = id;
+            }
+            else
+            {
+                GameSession gs = new GameSession(playerWaitingForMatch, id);
+                gameSessions.AddLast(gs);
+                SendMessageToClient(ServertoClientSignifiers.GameSessionStarted + "", playerWaitingForMatch);
+                SendMessageToClient(ServertoClientSignifiers.GameSessionStarted + "", id);
+
+                playerWaitingForMatch = -1;
+            }
+
+        }
+        else if (signifier == ClientToSeverSignifiers.TicTacToePlay)
+        {
+            Debug.Log("Playing tic tac toe with someone");
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(ServertoClientSignifiers.OpponentTicTacToePlay + "", gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(ServertoClientSignifiers.OpponentTicTacToePlay + "", gs.playerID1);
+            }
+        }
+
     }
     static public void LoadPlayerAccounts()
     {
@@ -167,6 +201,15 @@ public class NetworkedServer : MonoBehaviour
         }
         sw.Close();
     }
+    private GameSession FindGameSessionWithPlayerID(int id)
+    {
+        foreach (GameSession gs in gameSessions)
+        {
+            if (id == gs.playerID1 || id == gs.playerID2)
+                return gs;
+        }
+        return null;
+    }
 
 }
 public class PlayerAccount
@@ -191,11 +234,15 @@ public static class ClientToSeverSignifiers
 {
     public const int Login = 1;
     public const int CreateAccount = 2;
+    public const int AddToGameSessionQueue = 3;
+    public const int TicTacToePlay = 4;
 }
 
 public static class ServertoClientSignifiers
 {
     public const int LoginResponse = 1;
+    public const int GameSessionStarted = 2;
+    public const int OpponentTicTacToePlay = 3;
 }
 
 public static class LoginResponse
@@ -211,6 +258,12 @@ public static class LoginResponse
 
 public class GameSession
 {
+    public int playerID1, playerID2;
+    public GameSession(int PlayerID1, int PlayerID2)
+    {
+        playerID1 = PlayerID1;
+        playerID2 = PlayerID2;
+    }
     //Hold two clients
     //to do work list
 }

@@ -168,7 +168,6 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToSeverSignifiers.TicTacToePlay)
         {
-            Debug.Log("Playing tic tac toe with someone");
             GameSession gs = FindGameSessionWithPlayerID(id);
 
             if (gs.playerID1 == id)
@@ -191,6 +190,32 @@ public class NetworkedServer : MonoBehaviour
             else
             {
                 SendMessageToClient(string.Join(",", ServertoClientSignifiers.OpponentPlayedAMove.ToString(), csv[1]), gs.playerID1);
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.GameOver)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString(), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString(), gs.playerID1);
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.GameDrawn)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(ServertoClientSignifiers.GameDrawn.ToString(), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(ServertoClientSignifiers.GameDrawn.ToString(), gs.playerID1);
             }
         }
 
@@ -260,6 +285,8 @@ public static class ClientToSeverSignifiers
     public const int AddToGameSessionQueue = 3;
     public const int TicTacToePlay = 4;
     public const int TicTacToeMoveMade = 5;
+    public const int GameOver = 6;
+    public const int GameDrawn = 7;
 }
 
 public static class ServertoClientSignifiers
@@ -268,6 +295,8 @@ public static class ServertoClientSignifiers
     public const int GameSessionStarted = 2;
     public const int OpponentTicTacToePlay = 3;
     public const int OpponentPlayedAMove = 4;
+    public const int OpponentWon = 5;
+    public const int GameDrawn = 6;
 }
 
 public static class LoginResponse

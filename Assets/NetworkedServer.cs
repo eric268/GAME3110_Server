@@ -197,11 +197,11 @@ public class NetworkedServer : MonoBehaviour
 
             if (gs.playerID1 == id)
             {
-                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString(), gs.playerID2);
+                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString() + "," + csv[1], gs.playerID2);
             }
             else
             {
-                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString(), gs.playerID1);
+                SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString() + "," + csv[1], gs.playerID1);
             }
             foreach(PlayerAccount p in accountInfo)
             {
@@ -250,6 +250,19 @@ public class NetworkedServer : MonoBehaviour
             }
             SendMessageToClient(ServertoClientSignifiers.LeaderboardShowRequest.ToString() + streamOfPlayersOnLeaderboard, id);
 
+        }
+        else if (signifier == ClientToSeverSignifiers.PlayerSentMessageInChat)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(string.Join(",",ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID1);
+            }
         }
 
 
@@ -326,6 +339,7 @@ public static class ClientToSeverSignifiers
     public const int GameDrawn = 7;
     public const int RestartGame = 8;
     public const int ShowLeaderboard = 9;
+    public const int PlayerSentMessageInChat = 10;
 }
 
 public static class ServertoClientSignifiers
@@ -338,6 +352,7 @@ public static class ServertoClientSignifiers
     public const int GameDrawn = 6;
     public const int OpponentRestartedGame = 7;
     public const int LeaderboardShowRequest = 8;
+    public const int SendPlayerChatToOpponent = 9;
 }
 
 public static class LoginResponse

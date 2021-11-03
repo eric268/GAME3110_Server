@@ -4,6 +4,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 using System.IO;
+using System.Linq;
 using UnityEngine.UI;
 
 public class NetworkedServer : MonoBehaviour
@@ -13,7 +14,6 @@ public class NetworkedServer : MonoBehaviour
     int unreliableChannelID;
     int hostID;
     int socketPort = 25565;
-
     const string fileName = "AccountInfoSaveFile.txt";
 
     LinkedList<GameSession> gameSessions;
@@ -104,8 +104,8 @@ public class NetworkedServer : MonoBehaviour
             }
             else
             {
-                accountInfo.AddLast(new PlayerAccount(n, p));
-                SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success, id);
+                accountInfo.AddLast(new PlayerAccount(n, p,0));
+                SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success + "," + n, id);
                 SavePlayerAccounts();
             }
         }
@@ -122,8 +122,7 @@ public class NetworkedServer : MonoBehaviour
                 {
                     if(pa.password == p)
                     {
-                        SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success, id);
-                        
+                        SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success + "," + n, id);
                     }
                     else
                     {
@@ -204,6 +203,14 @@ public class NetworkedServer : MonoBehaviour
             {
                 SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString(), gs.playerID1);
             }
+            foreach(PlayerAccount p in accountInfo)
+            {
+                if (p.userName == csv[1])
+                {
+                    p.totalNumberOfWins++;
+                    SavePlayerAccounts();
+                }
+            }
         }
         else if (signifier == ClientToSeverSignifiers.GameDrawn)
         {
@@ -218,6 +225,34 @@ public class NetworkedServer : MonoBehaviour
                 SendMessageToClient(ServertoClientSignifiers.GameDrawn.ToString(), gs.playerID1);
             }
         }
+        else if (signifier == ClientToSeverSignifiers.RestartGame)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(ServertoClientSignifiers.OpponentRestartedGame.ToString(), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(ServertoClientSignifiers.GameDrawn.ToString(), gs.playerID1);
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.ShowLeaderboard)
+        {
+            IEnumerable<PlayerAccount> sortedAccountInfo = accountInfo.OrderByDescending(item => item.totalNumberOfWins);
+
+            int playersOnLeaderboardSignifier = (sortedAccountInfo.Count() >= 10) ? 10 : sortedAccountInfo.Count();
+            string streamOfPlayersOnLeaderboard =  "," + playersOnLeaderboardSignifier.ToString();
+            foreach (PlayerAccount p in sortedAccountInfo)
+            {
+                streamOfPlayersOnLeaderboard += ("," + p.userName + "," + p.totalNumberOfWins);
+            }
+            SendMessageToClient(ServertoClientSignifiers.LeaderboardShowRequest.ToString() + streamOfPlayersOnLeaderboard, id);
+
+        }
+
+
 
     }
     static public void LoadPlayerAccounts()
@@ -233,7 +268,7 @@ public class NetworkedServer : MonoBehaviour
                 int saveDataIdentifyer = int.Parse(arr[0]);
                 if (saveDataIdentifyer == PlayerAccountIdentifyer)
                 {
-                    PlayerAccount player = new PlayerAccount(arr[1], arr[2]);
+                    PlayerAccount player = new PlayerAccount(arr[1], arr[2], int.Parse(arr[3]));
                     accountInfo.AddLast(player);
                 }
             }
@@ -245,7 +280,7 @@ public class NetworkedServer : MonoBehaviour
         StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + fileName);
         foreach (PlayerAccount player in accountInfo)
         {
-            sw.WriteLine(PlayerAccountIdentifyer + "," + player.userName + "," + player.password);
+            sw.WriteLine(PlayerAccountIdentifyer + "," + player.userName + "," + player.password + "," + player.totalNumberOfWins);
         }
         sw.Close();
     }
@@ -263,10 +298,12 @@ public class NetworkedServer : MonoBehaviour
 public class PlayerAccount
 {
     public string userName, password;
-    public PlayerAccount(string n, string p)
+    public int totalNumberOfWins;
+    public PlayerAccount(string n, string p, int totalWins)
     {
         userName = n;
         password = p;
+        totalNumberOfWins = totalWins;
     }
     static public bool operator==(PlayerAccount p1, PlayerAccount p2)
     {
@@ -287,6 +324,8 @@ public static class ClientToSeverSignifiers
     public const int TicTacToeMoveMade = 5;
     public const int GameOver = 6;
     public const int GameDrawn = 7;
+    public const int RestartGame = 8;
+    public const int ShowLeaderboard = 9;
 }
 
 public static class ServertoClientSignifiers
@@ -297,6 +336,8 @@ public static class ServertoClientSignifiers
     public const int OpponentPlayedAMove = 4;
     public const int OpponentWon = 5;
     public const int GameDrawn = 6;
+    public const int OpponentRestartedGame = 7;
+    public const int LeaderboardShowRequest = 8;
 }
 
 public static class LoginResponse

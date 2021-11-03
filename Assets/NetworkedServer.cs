@@ -149,8 +149,18 @@ public class NetworkedServer : MonoBehaviour
             {
                 GameSession gs = new GameSession(playerWaitingForMatch, id);
                 gameSessions.AddLast(gs);
-                SendMessageToClient(ServertoClientSignifiers.GameSessionStarted + "", playerWaitingForMatch);
-                SendMessageToClient(ServertoClientSignifiers.GameSessionStarted + "", id);
+
+                int randomNumberForGameSymbol = Random.Range(0, 2);
+                string playerWaitingForMatchSymbol = (randomNumberForGameSymbol == 0) ? "X" : "O";
+                string currentPlayersSymbol = (playerWaitingForMatchSymbol == "X") ? "O" : "X";
+
+                
+
+                int playerWaitingForMatchMovesFirst = Random.Range(0, 2);
+                int currentPlayersMove = (playerWaitingForMatchMovesFirst == 1) ? 0 : 1;
+
+                SendMessageToClient(string.Join(",",ServertoClientSignifiers.GameSessionStarted.ToString(), playerWaitingForMatchSymbol, playerWaitingForMatchMovesFirst), playerWaitingForMatch);
+                SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionStarted, currentPlayersSymbol, currentPlayersMove) + "", id);
 
                 playerWaitingForMatch = -1;
             }
@@ -168,6 +178,19 @@ public class NetworkedServer : MonoBehaviour
             else
             {
                 SendMessageToClient(ServertoClientSignifiers.OpponentTicTacToePlay + "", gs.playerID1);
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.TicTacToeMoveMade)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(string.Join(",",ServertoClientSignifiers.OpponentPlayedAMove.ToString(),csv[1]), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(string.Join(",", ServertoClientSignifiers.OpponentPlayedAMove.ToString(), csv[1]), gs.playerID1);
             }
         }
 
@@ -236,6 +259,7 @@ public static class ClientToSeverSignifiers
     public const int CreateAccount = 2;
     public const int AddToGameSessionQueue = 3;
     public const int TicTacToePlay = 4;
+    public const int TicTacToeMoveMade = 5;
 }
 
 public static class ServertoClientSignifiers
@@ -243,6 +267,7 @@ public static class ServertoClientSignifiers
     public const int LoginResponse = 1;
     public const int GameSessionStarted = 2;
     public const int OpponentTicTacToePlay = 3;
+    public const int OpponentPlayedAMove = 4;
 }
 
 public static class LoginResponse

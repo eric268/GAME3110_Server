@@ -15,8 +15,10 @@ public class NetworkedServer : MonoBehaviour
     int hostID;
     int socketPort = 25565;
     const string fileName = "AccountInfoSaveFile.txt";
+    const string recordingFileName = "RecordingInfoSaveFile.txt";
 
     LinkedList<GameSession> gameSessions;
+    List<string> replayManager;
     GameSessionManager gameSessionManager;
     int playerWaitingForMatch = -1;
     const int PlayerAccountIdentifyer = 1;
@@ -35,7 +37,9 @@ public class NetworkedServer : MonoBehaviour
 
         accountInfo = new LinkedList<PlayerAccount>();
         gameSessionManager = new GameSessionManager();
+        replayManager = new List<string>();
         LoadPlayerAccounts();
+        LoadRecordings();
         
     }
 
@@ -148,7 +152,6 @@ public class NetworkedServer : MonoBehaviour
             else
             {
                 int gameRoomID = GameSessionManager.GetGameSessionIDNumber();
-                Debug.Log("New game session started with id" +gameRoomID);
                 GameSession gs = new GameSession(playerWaitingForMatch, id, gameRoomID);
                 gameSessionManager.allGameSessions.Add(gs);
 
@@ -183,7 +186,6 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToSeverSignifiers.TicTacToeMoveMade)
         {
-            Debug.Log("Move made by : " + id);
             GameSession gs = FindGameSessionWithPlayerID(id);
 
             if (gs != null)
@@ -199,7 +201,6 @@ public class NetworkedServer : MonoBehaviour
                 foreach (int observerID in gs.observerIDs)
                 {
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.UpdateObserverOnMoveMade.ToString(), csv[1], csv[2]), observerID);
-                    Debug.Log("Message send to observer with id: " + observerID);
                 }
             }
         }
@@ -305,31 +306,42 @@ public class NetworkedServer : MonoBehaviour
         {
             //bool gameSessionFound = false;
             int searchedGameID = int.Parse(csv[1]);
-            Debug.Log("Search made for room " + searchedGameID);
             foreach (GameSession gs in gameSessionManager.allGameSessions)
             {
                 if (searchedGameID == gs.gameRoomID)
                 {
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.GetCellsOfTicTacToeBoard.ToString(), id.ToString()), gs.playerID1);
                     gs.observerIDs.Add(id);
-                    Debug.Log("Game room found");
                 }
-
                 break;
             }
-            Debug.Log("Game room not");
         }
         else if (signifier == ClientToSeverSignifiers.SendCellsOfTicTacToeBoardToServer)
         {
             int requesterID = int.Parse(csv[1]);
             string boardResults = csv[2];
-            Debug.Log(boardResults);
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendTicTacToeCellsToObserver.ToString(), boardResults), requesterID);
         }
-
-
-
+        else if (signifier == ClientToSeverSignifiers.RecordingSentToServer)
+        {
+            //Want to remove the signifier and , then save it all as its already formatted
+            int lengthOfSubString = msg.Length - 3;
+            string trimmedMessage = msg.Substring(3, lengthOfSubString);
+            replayManager.Add(trimmedMessage);
+            SaveRecordings();
+        }
+        else if (signifier == ClientToSeverSignifiers.RecordingRequestedFromServer)
+        {
+            int recordingID = int.Parse(csv[1]);
+            string recordingInfo = replayManager[recordingID];
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingSentToClient.ToString(), recordingInfo), id);
+        }
+        else if (signifier == ClientToSeverSignifiers.RequestNumberOfSavedRecordings)
+        {
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), replayManager.Count), id);
+        }
     }
+
     static public void LoadPlayerAccounts()
     {
         string path = Application.dataPath + Path.DirectorySeparatorChar + fileName;
@@ -381,6 +393,40 @@ public class NetworkedServer : MonoBehaviour
         return null;
     }
 
+
+    public void SaveRecordings()
+    {
+        StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + recordingFileName);
+        foreach (var recording in replayManager)
+        {
+            sw.WriteLine(recording);
+            Debug.Log("Saved Recording: " + recording);
+        }
+        sw.Close();
+    }
+    public void LoadRecordings()
+    {
+        string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
+        if (File.Exists(path))
+        {
+            StreamReader sr = new StreamReader(path);
+            string line = "";
+            while ((line = sr.ReadLine()) != null)
+            {
+                replayManager.Add(line);
+                Debug.Log("Loaded Recording: " + line);
+            }
+            sr.Close();
+        }
+    }
+    public static void SendRecordingToPlayer()
+    {
+
+
+
+    }
+
+
 }
 public class PlayerAccount
 {
@@ -416,6 +462,10 @@ public static class ClientToSeverSignifiers
     public const int PlayerSentMessageInChat = 10;
     public const int SearchGameRoomRequestMade = 11;
     public const int SendCellsOfTicTacToeBoardToServer = 12;
+    public const int RecordingSentToServer = 13;
+    public const int RecordingRequestedFromServer = 14;
+    public const int RequestNumberOfSavedRecordings = 15;
+    public const int ClearRecordingOnServer = 16;
 
 }
 
@@ -434,6 +484,8 @@ public static class ServertoClientSignifiers
     public const int GetCellsOfTicTacToeBoard = 11;
     public const int SendTicTacToeCellsToObserver = 12;
     public const int UpdateObserverOnMoveMade = 13;
+    public const int RecordingSentToClient = 14;
+    public const int SendNumberOfSavedRecordings = 15;
 }
 
 public static class LoginResponse
@@ -481,3 +533,23 @@ public class GameSessionManager
         allGameSessions = new List<GameSession>();
     }
 }
+
+//public class ReplayRecorder
+//{
+//    public static int turnNumber = 0;
+//    public string name;
+//    public int numberOfTurns;
+//    public string startingSymbol;
+//    public float[] timeBetweenTurnsArray;
+//    public int[] cellNumberOfTurn;
+//    public float gameID;
+
+//    public ReplayRecorder()
+//    {
+//        name = "";
+//        numberOfTurns = 0;
+//        startingSymbol = "";
+//        timeBetweenTurnsArray = new float[9];
+//        cellNumberOfTurn = new int[9];
+//    }
+//}

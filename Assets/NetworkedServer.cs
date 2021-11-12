@@ -333,6 +333,8 @@ public class NetworkedServer : MonoBehaviour
             //Want to remove the signifier and , then save it all as its already formatted
             int lengthOfSubString = msg.Length - 3;
             string trimmedMessage = msg.Substring(3, lengthOfSubString);
+
+            Debug.Log("Recording sent from server: " + trimmedMessage);
             replayManager.Add(trimmedMessage);
             SaveRecordings();
         }

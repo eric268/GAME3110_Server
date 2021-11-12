@@ -17,6 +17,7 @@ public class NetworkedServer : MonoBehaviour
     const string fileName = "AccountInfoSaveFile.txt";
 
     LinkedList<GameSession> gameSessions;
+    GameSessionManager gameSessionManager;
     int playerWaitingForMatch = -1;
     const int PlayerAccountIdentifyer = 1;
 
@@ -33,7 +34,7 @@ public class NetworkedServer : MonoBehaviour
         hostID = NetworkTransport.AddHost(topology, socketPort, null);
 
         accountInfo = new LinkedList<PlayerAccount>();
-        gameSessions = new LinkedList<GameSession>();
+        gameSessionManager = new GameSessionManager();
         LoadPlayerAccounts();
         
     }
@@ -146,8 +147,10 @@ public class NetworkedServer : MonoBehaviour
             }
             else
             {
-                GameSession gs = new GameSession(playerWaitingForMatch, id);
-                gameSessions.AddLast(gs);
+                int gameRoomID = GameSessionManager.GetGameSessionIDNumber();
+                Debug.Log("New game session started with id" +gameRoomID);
+                GameSession gs = new GameSession(playerWaitingForMatch, id, gameRoomID);
+                gameSessionManager.allGameSessions.Add(gs);
 
                 int randomNumberForGameSymbol = Random.Range(0, 2);
                 string playerWaitingForMatchSymbol = (randomNumberForGameSymbol == 0) ? "X" : "O";
@@ -158,8 +161,8 @@ public class NetworkedServer : MonoBehaviour
                 int playerWaitingForMatchMovesFirst = Random.Range(0, 2);
                 int currentPlayersMove = (playerWaitingForMatchMovesFirst == 1) ? 0 : 1;
 
-                SendMessageToClient(string.Join(",",ServertoClientSignifiers.GameSessionStarted.ToString(), playerWaitingForMatchSymbol, playerWaitingForMatchMovesFirst), playerWaitingForMatch);
-                SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionStarted, currentPlayersSymbol, currentPlayersMove) + "", id);
+                SendMessageToClient(string.Join(",",ServertoClientSignifiers.GameSessionStarted.ToString(), playerWaitingForMatchSymbol, playerWaitingForMatchMovesFirst, gameRoomID.ToString()), playerWaitingForMatch);
+                SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionStarted, currentPlayersSymbol, currentPlayersMove, gameRoomID.ToString()) + "", id);
 
                 playerWaitingForMatch = -1;
             }
@@ -180,15 +183,24 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToSeverSignifiers.TicTacToeMoveMade)
         {
+            Debug.Log("Move made by : " + id);
             GameSession gs = FindGameSessionWithPlayerID(id);
 
-            if (gs.playerID1 == id)
+            if (gs != null)
             {
-                SendMessageToClient(string.Join(",",ServertoClientSignifiers.OpponentPlayedAMove.ToString(),csv[1]), gs.playerID2);
-            }
-            else
-            {
-                SendMessageToClient(string.Join(",", ServertoClientSignifiers.OpponentPlayedAMove.ToString(), csv[1]), gs.playerID1);
+                if (gs.playerID1 == id)
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.OpponentPlayedAMove.ToString(), csv[1]), gs.playerID2);
+                }
+                else
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.OpponentPlayedAMove.ToString(), csv[1]), gs.playerID1);
+                }
+                foreach (int observerID in gs.observerIDs)
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.UpdateObserverOnMoveMade.ToString(), csv[1], csv[2]), observerID);
+                    Debug.Log("Message send to observer with id: " + observerID);
+                }
             }
         }
         else if (signifier == ClientToSeverSignifiers.GameOver)
@@ -254,15 +266,65 @@ public class NetworkedServer : MonoBehaviour
         else if (signifier == ClientToSeverSignifiers.PlayerSentMessageInChat)
         {
             GameSession gs = FindGameSessionWithPlayerID(id);
-
-            if (gs.playerID1 == id)
+            if (gs != null)
             {
-                SendMessageToClient(string.Join(",",ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID2);
+                if (gs.playerID1 == id)
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID2);
+                }
+                else
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID1);
+                }
+
+                foreach (int observerNum in gs.observerIDs)
+                {
+                    if (observerNum != id)
+                        SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), observerNum);
+                }
             }
             else
             {
-                SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID1);
+                gs = FindGameSessionWithObserverID(id);
+                if (gs != null)
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID1);
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID2);
+
+                    foreach(int observerNum in gs.observerIDs)
+                    {
+                        if (observerNum != id)
+                            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), observerNum);
+
+                    }
+                }
+
             }
+        }
+        else if (signifier == ClientToSeverSignifiers.SearchGameRoomRequestMade)
+        {
+            //bool gameSessionFound = false;
+            int searchedGameID = int.Parse(csv[1]);
+            Debug.Log("Search made for room " + searchedGameID);
+            foreach (GameSession gs in gameSessionManager.allGameSessions)
+            {
+                if (searchedGameID == gs.gameRoomID)
+                {
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.GetCellsOfTicTacToeBoard.ToString(), id.ToString()), gs.playerID1);
+                    gs.observerIDs.Add(id);
+                    Debug.Log("Game room found");
+                }
+
+                break;
+            }
+            Debug.Log("Game room not");
+        }
+        else if (signifier == ClientToSeverSignifiers.SendCellsOfTicTacToeBoardToServer)
+        {
+            int requesterID = int.Parse(csv[1]);
+            string boardResults = csv[2];
+            Debug.Log(boardResults);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendTicTacToeCellsToObserver.ToString(), boardResults), requesterID);
         }
 
 
@@ -299,10 +361,22 @@ public class NetworkedServer : MonoBehaviour
     }
     private GameSession FindGameSessionWithPlayerID(int id)
     {
-        foreach (GameSession gs in gameSessions)
+        foreach (GameSession gs in gameSessionManager.allGameSessions)
         {
             if (id == gs.playerID1 || id == gs.playerID2)
                 return gs;
+        }
+        return null;
+    }
+    private GameSession FindGameSessionWithObserverID(int id)
+    {
+        foreach (GameSession gs in gameSessionManager.allGameSessions)
+        {
+            foreach(int observerID in gs.observerIDs)
+            {
+                if (observerID == id)
+                    return gs;
+            }
         }
         return null;
     }
@@ -340,6 +414,9 @@ public static class ClientToSeverSignifiers
     public const int RestartGame = 8;
     public const int ShowLeaderboard = 9;
     public const int PlayerSentMessageInChat = 10;
+    public const int SearchGameRoomRequestMade = 11;
+    public const int SendCellsOfTicTacToeBoardToServer = 12;
+
 }
 
 public static class ServertoClientSignifiers
@@ -353,6 +430,10 @@ public static class ServertoClientSignifiers
     public const int OpponentRestartedGame = 7;
     public const int LeaderboardShowRequest = 8;
     public const int SendPlayerChatToOpponent = 9;
+    public const int SearchFoundValidGameRoom = 10;
+    public const int GetCellsOfTicTacToeBoard = 11;
+    public const int SendTicTacToeCellsToObserver = 12;
+    public const int UpdateObserverOnMoveMade = 13;
 }
 
 public static class LoginResponse
@@ -369,11 +450,34 @@ public static class LoginResponse
 public class GameSession
 {
     public int playerID1, playerID2;
-    public GameSession(int PlayerID1, int PlayerID2)
+    public int gameRoomID;
+    public List<int> observerIDs;
+    public bool player1InRoom, player2InRoom;
+
+    public GameSession(int PlayerID1, int PlayerID2, int roomID)
     {
         playerID1 = PlayerID1;
         playerID2 = PlayerID2;
+        gameRoomID = roomID;
+
+        player1InRoom = true;
+        player2InRoom = true;
+
+        observerIDs = new List<int>();
     }
-    //Hold two clients
-    //to do work list
+}
+
+public class GameSessionManager
+{
+    public static int nextGameSessionIDNumber = 100;
+    public static int GetGameSessionIDNumber()
+    {
+        nextGameSessionIDNumber++;
+        return nextGameSessionIDNumber;
+    }
+    public List<GameSession> allGameSessions;
+    public GameSessionManager() 
+    {
+        allGameSessions = new List<GameSession>();
+    }
 }

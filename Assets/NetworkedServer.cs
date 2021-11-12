@@ -134,15 +134,13 @@ public class NetworkedServer : MonoBehaviour
                     if(pa.password == p)
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success + "," + n, id);
+                        return;
                     }
                     else
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureIncorrectPassword, id);
-                        
                         return;
                     }
-                    hasBeenFound = true;
-                    break;
                 }
 
             }
@@ -317,8 +315,8 @@ public class NetworkedServer : MonoBehaviour
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.GetCellsOfTicTacToeBoard.ToString(), id.ToString()), gs.playerID1);
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionSearchResponse, GameRoomSearchResponse.SearchSucceeded), id);
                     gs.observerIDs.Add(id);
+                    return;
                 }
-                break;
             }
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionSearchResponse, GameRoomSearchResponse.SearchFailed), id);
         }
@@ -360,13 +358,16 @@ public class NetworkedServer : MonoBehaviour
         {
             Debug.Log("Player left game room");
             GameSession gs = FindGameSessionWithPlayerID(id);
-            if (id == gs.playerID1)
-                gs.player1InRoom = false;
-            else
-                gs.player2InRoom = false;
+            if (gs != null)
+            {
+                if (id == gs.playerID1)
+                    gs.player1InRoom = false;
+                else
+                    gs.player2InRoom = false;
 
-            if (!gs.player1InRoom && !gs.player2InRoom)
-                gameSessionManager.allGameSessions.Remove(gs);
+                if (!gs.player1InRoom && !gs.player2InRoom)
+                    gameSessionManager.allGameSessions.Remove(gs);
+            }
         }
         else if (signifier == ClientToSeverSignifiers.PlayerHasLeftGameQueue)
         {

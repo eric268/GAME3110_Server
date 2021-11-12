@@ -39,8 +39,7 @@ public class NetworkedServer : MonoBehaviour
         gameSessionManager = new GameSessionManager();
         replayManager = new List<string>();
         LoadPlayerAccounts();
-        LoadRecordings();
-        
+        LoadAllRecordings();
     }
 
     // Update is called once per frame
@@ -332,13 +331,21 @@ public class NetworkedServer : MonoBehaviour
         }
         else if (signifier == ClientToSeverSignifiers.RecordingRequestedFromServer)
         {
-            int recordingID = int.Parse(csv[1]);
-            string recordingInfo = replayManager[recordingID];
+            string userName = csv[1];
+            int recordingNumber = int.Parse(csv[2]);
+            string recordingInfo = LoadRecordings(userName)[recordingNumber];
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingSentToClient.ToString(), recordingInfo), id);
         }
         else if (signifier == ClientToSeverSignifiers.RequestNumberOfSavedRecordings)
         {
-            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), replayManager.Count), id);
+            string userName = csv[1];
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordings(userName).Count), id);
+        }
+        else if (signifier == ClientToSeverSignifiers.ClearRecordingOnServer)
+        {
+            string userName = csv[1];
+            DeleteRecordingsBelongingToUser(userName);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordings(userName).Count), id);
         }
     }
 
@@ -362,6 +369,7 @@ public class NetworkedServer : MonoBehaviour
             sr.Close();
         }
     }
+
     static public void SavePlayerAccounts()
     {
         StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + fileName);
@@ -404,7 +412,29 @@ public class NetworkedServer : MonoBehaviour
         }
         sw.Close();
     }
-    public void LoadRecordings()
+    public static List<string> LoadRecordings(string userName)
+    {
+        List<string> playerReplayManager = new List<string>();
+        string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
+        if (File.Exists(path))
+        {
+            StreamReader sr = new StreamReader(path);
+            string line = "";
+            while ((line = sr.ReadLine()) != null)
+            {
+                string[] csv = line.Split(',');
+                if (csv[0] == userName)
+                {
+                    playerReplayManager.Add(line);
+                    Debug.Log("Loaded Recording: " + line);
+                }
+            }
+            sr.Close();
+        }
+        return playerReplayManager;
+    }
+
+    public void LoadAllRecordings()
     {
         string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
         if (File.Exists(path))
@@ -413,20 +443,37 @@ public class NetworkedServer : MonoBehaviour
             string line = "";
             while ((line = sr.ReadLine()) != null)
             {
-                replayManager.Add(line);
-                Debug.Log("Loaded Recording: " + line);
+                string[] csv = line.Split(',');
+
+                    replayManager.Add(line);   
             }
             sr.Close();
         }
     }
-    public static void SendRecordingToPlayer()
+
+    public void DeleteRecordingsBelongingToUser(string userName)
     {
+        List<string> recordingsToNotDelete = new List<string>();
+        string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
+        if (File.Exists(path))
+        {
+            StreamReader sr = new StreamReader(path);
+            string line = "";
+            while ((line = sr.ReadLine()) != null)
+            {
+                string[] csv = line.Split(',');
+                if (csv[0] != userName)
+                {
+                    recordingsToNotDelete.Add(line);
+                }
+                replayManager.Add(line);
+            }
 
-
-
+            replayManager = recordingsToNotDelete;
+            SaveRecordings();
+            sr.Close();
+        }
     }
-
-
 }
 public class PlayerAccount
 {
@@ -486,6 +533,7 @@ public static class ServertoClientSignifiers
     public const int UpdateObserverOnMoveMade = 13;
     public const int RecordingSentToClient = 14;
     public const int SendNumberOfSavedRecordings = 15;
+    public const int ReloadDropDownMenu = 16;
 }
 
 public static class LoginResponse

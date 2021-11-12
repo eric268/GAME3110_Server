@@ -85,6 +85,13 @@ public class NetworkedServer : MonoBehaviour
     {
         Debug.Log("msg received = " + msg + ".  connection id = " + id);
 
+        if (msg == null)
+        {
+            Debug.Log("Found error");
+            int val = 1009;
+            val--;
+        }
+
         string[] csv = msg.Split(',');
         int signifier = int.Parse(csv[0]);
 
@@ -119,7 +126,6 @@ public class NetworkedServer : MonoBehaviour
             string p = csv[2];
             bool hasBeenFound = false;
            
-
             foreach (PlayerAccount pa in accountInfo)
             {
                 if (pa.userName == n)
@@ -157,8 +163,6 @@ public class NetworkedServer : MonoBehaviour
                 int randomNumberForGameSymbol = Random.Range(0, 2);
                 string playerWaitingForMatchSymbol = (randomNumberForGameSymbol == 0) ? "X" : "O";
                 string currentPlayersSymbol = (playerWaitingForMatchSymbol == "X") ? "O" : "X";
-
-                
 
                 int playerWaitingForMatchMovesFirst = Random.Range(0, 2);
                 int currentPlayersMove = (playerWaitingForMatchMovesFirst == 1) ? 0 : 1;
@@ -347,6 +351,22 @@ public class NetworkedServer : MonoBehaviour
             DeleteRecordingsBelongingToUser(userName);
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordings(userName).Count), id);
         }
+        else if (signifier == ClientToSeverSignifiers.PlayerLeftGameRoom)
+        {
+            Debug.Log("Player left game room");
+            GameSession gs = FindGameSessionWithPlayerID(id);
+            if (id == gs.playerID1)
+                gs.player1InRoom = false;
+            else
+                gs.player2InRoom = false;
+
+            if (!gs.player1InRoom && !gs.player2InRoom)
+                gameSessionManager.allGameSessions.Remove(gs);
+        }
+        else if (signifier == ClientToSeverSignifiers.PlayerHasLeftGameQueue)
+        {
+            playerWaitingForMatch = -1;
+        }
     }
 
     static public void LoadPlayerAccounts()
@@ -468,10 +488,11 @@ public class NetworkedServer : MonoBehaviour
                 }
                 replayManager.Add(line);
             }
-
+            replayManager.Clear();
             replayManager = recordingsToNotDelete;
-            SaveRecordings();
             sr.Close();
+            SaveRecordings();
+
         }
     }
 }
@@ -513,7 +534,8 @@ public static class ClientToSeverSignifiers
     public const int RecordingRequestedFromServer = 14;
     public const int RequestNumberOfSavedRecordings = 15;
     public const int ClearRecordingOnServer = 16;
-
+    public const int PlayerLeftGameRoom = 17;
+    public const int PlayerHasLeftGameQueue = 18;
 }
 
 public static class ServertoClientSignifiers

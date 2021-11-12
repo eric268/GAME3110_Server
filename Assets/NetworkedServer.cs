@@ -112,6 +112,7 @@ public class NetworkedServer : MonoBehaviour
             if (!isUnique)
             {
                 SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameInUse, id);
+                return;
             }
             else
             {
@@ -138,7 +139,7 @@ public class NetworkedServer : MonoBehaviour
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureIncorrectPassword, id);
                         
-                        break;
+                        return;
                     }
                     hasBeenFound = true;
                     break;
@@ -314,10 +315,12 @@ public class NetworkedServer : MonoBehaviour
                 if (searchedGameID == gs.gameRoomID)
                 {
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.GetCellsOfTicTacToeBoard.ToString(), id.ToString()), gs.playerID1);
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionSearchResponse, GameRoomSearchResponse.SearchSucceeded), id);
                     gs.observerIDs.Add(id);
                 }
                 break;
             }
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionSearchResponse, GameRoomSearchResponse.SearchFailed), id);
         }
         else if (signifier == ClientToSeverSignifiers.SendCellsOfTicTacToeBoardToServer)
         {
@@ -556,6 +559,7 @@ public static class ServertoClientSignifiers
     public const int RecordingSentToClient = 14;
     public const int SendNumberOfSavedRecordings = 15;
     public const int ReloadDropDownMenu = 16;
+    public const int GameSessionSearchResponse = 17;
 }
 
 public static class LoginResponse
@@ -567,6 +571,12 @@ public static class LoginResponse
     public const int FailureNameNotFound = 3;
 
     public const int FailureIncorrectPassword = 4;
+}
+
+public static class GameRoomSearchResponse
+{
+    public const int SearchSucceeded = 1;
+    public const int SearchFailed = 2;
 }
 
 public class GameSession

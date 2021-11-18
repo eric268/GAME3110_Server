@@ -69,6 +69,7 @@ public class NetworkedServer : MonoBehaviour
                 break;
             case NetworkEventType.DisconnectEvent:
                 Debug.Log("Disconnection, " + recConnectionID);
+                PlayerDisconnectedFromGameSession(recConnectionID);
                 break;
         }
 
@@ -357,6 +358,8 @@ public class NetworkedServer : MonoBehaviour
         else if (signifier == ClientToSeverSignifiers.PlayerLeftGameRoom)
         {
             Debug.Log("Player left game room");
+            string sender = "System";
+            string message = "Player left room";
             GameSession gs = FindGameSessionWithPlayerID(id);
             if (gs != null)
             {
@@ -366,7 +369,26 @@ public class NetworkedServer : MonoBehaviour
                     gs.player2InRoom = false;
 
                 if (!gs.player1InRoom && !gs.player2InRoom)
+                {
+                    foreach (int observerNum in gs.observerIDs)
+                    {
+                        if (observerNum != id)
+                            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), observerNum);
+                    }
                     gameSessionManager.allGameSessions.Remove(gs);
+                }
+                else
+                {
+                    if (id == gs.playerID1)
+                        SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), gs.playerID2);
+                    else
+                        SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), gs.playerID1);
+                    foreach (int observerNum in gs.observerIDs)
+                    {
+                        if (observerNum != id)
+                            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), observerNum);
+                    }
+                }
             }
         }
         else if (signifier == ClientToSeverSignifiers.PlayerHasLeftGameQueue)
@@ -501,6 +523,34 @@ public class NetworkedServer : MonoBehaviour
 
         }
     }
+    void PlayerDisconnectedFromGameSession(int id)
+    {
+        GameSession gs = FindGameSessionWithPlayerID(id);
+        if (gs != null)
+        {
+            if (id == gs.playerID1)
+                gs.player1InRoom = false;
+            else
+                gs.player2InRoom = false;
+
+            string sender = "System";
+            string message = "Player disconnected from room";
+
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), gs.playerID1);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), gs.playerID2);
+
+            foreach (int observerNum in gs.observerIDs)
+            {
+                if (observerNum != id)
+                    SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), observerNum);
+            }
+            
+
+
+            if (!gs.player1InRoom && !gs.player2InRoom)
+                gameSessionManager.allGameSessions.Remove(gs);
+        }
+    }
 }
 public class PlayerAccount
 {
@@ -604,7 +654,7 @@ public class GameSession
 
 public class GameSessionManager
 {
-    public static int nextGameSessionIDNumber = 100;
+    public static int nextGameSessionIDNumber = 0;
     public static int GetGameSessionIDNumber()
     {
         nextGameSessionIDNumber++;

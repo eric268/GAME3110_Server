@@ -331,13 +331,6 @@ public class NetworkedServer : MonoBehaviour
             string boardResults = csv[2];
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendTicTacToeCellsToObserver.ToString(), boardResults), requesterID);
         }
-        else if (signifier == ClientToSeverSignifiers.RecordingRequestedFromServer)
-        {
-            string userName = csv[1];
-            int recordingNumber = int.Parse(csv[2]);
-            string recordingInfo = LoadRecordings(userName)[recordingNumber];
-            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingStartingToBeSentToClient.ToString(), recordingInfo), id);
-        }
         else if (signifier == ClientToSeverSignifiers.RequestNumberOfSavedRecordings)
         {
             string userName = csv[1];
@@ -425,6 +418,21 @@ public class NetworkedServer : MonoBehaviour
             string serializedRecording = SerializeReplayRecorder(currentReplay);
             replayManager.Add(serializedRecording);
             SaveRecordings();
+        }
+        else if (signifier == ClientToSeverSignifiers.RecordingRequestedFromServer)
+        {
+            string userName = csv[1];
+            int recordingNumber = int.Parse(csv[2]);
+            string recordingInfo = LoadRecordings(userName)[recordingNumber];
+
+            currentReplay = DeserializeReplayRecording(recordingInfo);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingStartingToBeSentToClient.ToString()), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.ServerSentRecordingUserName.ToString() + "," + currentReplay.username), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.ServerSentRecordedStartingSymbol.ToString() + "," + currentReplay.startingSymbol), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.ServerSentRecordedNumberOfTurns.ToString() + "," + currentReplay.numberOfTurns) , id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.ServerSentRecordedTimeBetweenTurns.ToString() + currentReplay.SerializeReplayTimes()) , id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.ServerSentRecordedIndexOfMoveLocation.ToString() + currentReplay.SerializeReplayMoveIndex()), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingFinishedSendingToClient.ToString()), id);
         }
     }
 
@@ -599,6 +607,28 @@ public class NetworkedServer : MonoBehaviour
 
         return recordingPacket;
     }
+
+    ReplayRecorder DeserializeReplayRecording(string recording)
+    {
+        ReplayRecorder replayRecording = new ReplayRecorder();
+        string[] csv = recording.Split(',');
+
+        int index = 0;
+        replayRecording.username = csv[index++];
+        replayRecording.startingSymbol = csv[index++];
+        replayRecording.numberOfTurns = int.Parse(csv[index++]);
+
+        for (int i = 0; i < replayRecording.numberOfTurns; i++)
+        {
+            replayRecording.timeBetweenTurnsArray.Add(float.Parse(csv[index++]));
+        }
+
+        for (int i = 0; i < replayRecording.numberOfTurns; i++)
+        {
+            replayRecording.cellNumberOfTurn.Add(int.Parse(csv[index++]));
+        }
+        return replayRecording;
+    }
 }
 public class PlayerAccount
 {
@@ -674,15 +704,13 @@ public static class ServertoClientSignifiers
 
     public const int RecordingStartingToBeSentToClient = 17;
 
-    public const int RecieveRecordingUserName = 18;
-    public const int RecieveRecordedNumberOfTurns = 19;
-    public const int RecieveRecordedStartingSymbol = 20;
-    public const int RecieveRecordedTimeBetweenturns = 21;
-    public const int RecieveRecordedIndexOfMoveLocation = 22;
+    public const int ServerSentRecordingUserName = 18;
+    public const int ServerSentRecordedNumberOfTurns = 19;
+    public const int ServerSentRecordedStartingSymbol = 20;
+    public const int ServerSentRecordedTimeBetweenTurns = 21;
+    public const int ServerSentRecordedIndexOfMoveLocation = 22;
 
     public const int RecordingFinishedSendingToClient = 23;
-
-
 }
 
 public static class LoginResponse

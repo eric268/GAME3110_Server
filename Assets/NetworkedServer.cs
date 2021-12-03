@@ -327,7 +327,7 @@ public class NetworkedServer : MonoBehaviour
             string boardResults = csv[2];
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendTicTacToeCellsToObserver.ToString(), boardResults), requesterID);
         }
-        else if (signifier == ClientToSeverSignifiers.RecordingSentToServer)
+        else if (signifier == ClientToSeverSignifiers.BeginSendingRecording)
         {
             //Want to remove the signifier and , then save it all as its already formatted
             int lengthOfSubString = msg.Length - 3;
@@ -342,7 +342,7 @@ public class NetworkedServer : MonoBehaviour
             string userName = csv[1];
             int recordingNumber = int.Parse(csv[2]);
             string recordingInfo = LoadRecordings(userName)[recordingNumber];
-            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingSentToClient.ToString(), recordingInfo), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingStartingToBeSentToClient.ToString(), recordingInfo), id);
         }
         else if (signifier == ClientToSeverSignifiers.RequestNumberOfSavedRecordings)
         {
@@ -586,12 +586,23 @@ public static class ClientToSeverSignifiers
     public const int PlayerSentMessageInChat = 10;
     public const int SearchGameRoomRequestMade = 11;
     public const int SendCellsOfTicTacToeBoardToServer = 12;
-    public const int RecordingSentToServer = 13;
-    public const int RecordingRequestedFromServer = 14;
-    public const int RequestNumberOfSavedRecordings = 15;
-    public const int ClearRecordingOnServer = 16;
-    public const int PlayerLeftGameRoom = 17;
-    public const int PlayerHasLeftGameQueue = 18;
+
+    public const int RequestNumberOfSavedRecordings = 13;
+    public const int ClearRecordingOnServer = 14;
+    public const int PlayerLeftGameRoom = 15;
+    public const int PlayerHasLeftGameQueue = 16;
+
+    public const int RecordingRequestedFromServer = 17;
+
+    public const int BeginSendingRecording = 18;
+
+    public const int SendRecordedPlayersUserName = 19;
+    public const int SendRecordedNumberOfTurns = 20;
+    public const int SendRecordedGamesStartingSymbol = 21;
+    public const int SendRecordedGamesTimeBetweenTurns = 22;
+    public const int SendRecordedGamesIndexOfMoveLocation = 23;
+
+    public const int FinishedSendingRecordingToServer = 24;
 }
 
 public static class ServertoClientSignifiers
@@ -609,10 +620,22 @@ public static class ServertoClientSignifiers
     public const int GetCellsOfTicTacToeBoard = 11;
     public const int SendTicTacToeCellsToObserver = 12;
     public const int UpdateObserverOnMoveMade = 13;
-    public const int RecordingSentToClient = 14;
-    public const int SendNumberOfSavedRecordings = 15;
-    public const int ReloadDropDownMenu = 16;
-    public const int GameSessionSearchResponse = 17;
+
+    public const int SendNumberOfSavedRecordings = 14;
+    public const int ReloadDropDownMenu = 15;
+    public const int GameSessionSearchResponse = 16;
+
+    public const int RecordingStartingToBeSentToClient = 17;
+
+    public const int RecieveRecordingUserName = 18;
+    public const int RecieveRecordedNumberOfTurns = 19;
+    public const int RecieveRecordedStartingSymbol = 20;
+    public const int RecieveRecordedTimeBetweenturns = 21;
+    public const int RecieveRecordedIndexOfMoveLocation = 22;
+
+    public const int RecordingFinishedSendingToClient = 23;
+
+
 }
 
 public static class LoginResponse
@@ -667,22 +690,41 @@ public class GameSessionManager
     }
 }
 
-//public class ReplayRecorder
-//{
-//    public static int turnNumber = 0;
-//    public string name;
-//    public int numberOfTurns;
-//    public string startingSymbol;
-//    public float[] timeBetweenTurnsArray;
-//    public int[] cellNumberOfTurn;
-//    public float gameID;
+public class ReplayRecorder
+{
+    public string username;
+    public static int turnNumber = 0;
+    public int numberOfTurns;
+    public string startingSymbol;
+    public List<float> timeBetweenTurnsArray;
+    public List<int> cellNumberOfTurn;
 
-//    public ReplayRecorder()
-//    {
-//        name = "";
-//        numberOfTurns = 0;
-//        startingSymbol = "";
-//        timeBetweenTurnsArray = new float[9];
-//        cellNumberOfTurn = new int[9];
-//    }
-//}
+
+    public ReplayRecorder()
+    {
+        numberOfTurns = 0;
+        startingSymbol = "";
+        timeBetweenTurnsArray = new List<float>();
+        cellNumberOfTurn = new List<int>();
+        username = "";
+    }
+    public string SerializeReplayTimes()
+    {
+        string timeSerialized = "";
+        foreach (float time in timeBetweenTurnsArray)
+        {
+            timeSerialized += ',' + time;
+        }
+        return timeSerialized;
+    }
+
+    public string SerializeReplayMoveIndex()
+    {
+        string moveIndexSerialized = "";
+        foreach (int index in cellNumberOfTurn)
+        {
+            moveIndexSerialized += ',' + index;
+        }
+        return moveIndexSerialized;
+    }
+}

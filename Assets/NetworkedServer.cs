@@ -23,6 +23,8 @@ public class NetworkedServer : MonoBehaviour
     int playerWaitingForMatch = -1;
     const int PlayerAccountIdentifyer = 1;
 
+    ReplayRecorder currentReplay;
+
     private static LinkedList<PlayerAccount> accountInfo;
 
     // Start is called before the first frame update
@@ -38,6 +40,8 @@ public class NetworkedServer : MonoBehaviour
         accountInfo = new LinkedList<PlayerAccount>();
         gameSessionManager = new GameSessionManager();
         replayManager = new List<string>();
+        currentReplay = new ReplayRecorder();
+        
         LoadPlayerAccounts();
         LoadAllRecordings();
     }
@@ -327,16 +331,6 @@ public class NetworkedServer : MonoBehaviour
             string boardResults = csv[2];
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendTicTacToeCellsToObserver.ToString(), boardResults), requesterID);
         }
-        else if (signifier == ClientToSeverSignifiers.BeginSendingRecording)
-        {
-            //Want to remove the signifier and , then save it all as its already formatted
-            int lengthOfSubString = msg.Length - 3;
-            string trimmedMessage = msg.Substring(3, lengthOfSubString);
-
-            Debug.Log("Recording sent from server: " + trimmedMessage);
-            replayManager.Add(trimmedMessage);
-            SaveRecordings();
-        }
         else if (signifier == ClientToSeverSignifiers.RecordingRequestedFromServer)
         {
             string userName = csv[1];
@@ -394,6 +388,43 @@ public class NetworkedServer : MonoBehaviour
         else if (signifier == ClientToSeverSignifiers.PlayerHasLeftGameQueue)
         {
             playerWaitingForMatch = -1;
+        }
+        else if (signifier == ClientToSeverSignifiers.BeginSendingRecording)
+        {
+            currentReplay = new ReplayRecorder();
+        }
+        else if (signifier == ClientToSeverSignifiers.SendRecordedPlayersUserName)
+        {
+            currentReplay.username = csv[1];
+        }
+        else if (signifier == ClientToSeverSignifiers.SendRecordedNumberOfTurns)
+        {
+            currentReplay.numberOfTurns =int.Parse(csv[1]);
+        }
+        else if (signifier == ClientToSeverSignifiers.SendRecordedGamesStartingSymbol)
+        {
+            currentReplay.startingSymbol = csv[1];
+        }
+        else if (signifier == ClientToSeverSignifiers.SendRecordedGamesTimeBetweenTurns)
+        {
+            //Starting at 1 cause of course signifier is 0
+            for (int i = 1; i < csv.Length; i++)
+            {
+                currentReplay.timeBetweenTurnsArray.Add(float.Parse(csv[i]));
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.SendRecordedGamesIndexOfMoveLocation)
+        {
+            for (int i = 1; i < csv.Length; i++)
+            {
+                currentReplay.cellNumberOfTurn.Add(int.Parse(csv[i]));
+            }
+        }
+        else if (signifier == ClientToSeverSignifiers.FinishedSendingRecordingToServer)
+        {
+            string serializedRecording = SerializeReplayRecorder(currentReplay);
+            replayManager.Add(serializedRecording);
+            SaveRecordings();
         }
     }
 
@@ -551,6 +582,23 @@ public class NetworkedServer : MonoBehaviour
                 gameSessionManager.allGameSessions.Remove(gs);
         }
     }
+
+    string SerializeReplayRecorder(ReplayRecorder recording)
+    {
+        string recordingPacket = string.Join(",", recording.username, recording.startingSymbol, recording.numberOfTurns);
+
+        foreach (float time in recording.timeBetweenTurnsArray)
+        {
+            recordingPacket += "," + time;
+        }
+
+        foreach (int turnNumber in recording.cellNumberOfTurn)
+        {
+            recordingPacket += "," + turnNumber;
+        }
+
+        return recordingPacket;
+    }
 }
 public class PlayerAccount
 {
@@ -595,7 +643,6 @@ public static class ClientToSeverSignifiers
     public const int RecordingRequestedFromServer = 17;
 
     public const int BeginSendingRecording = 18;
-
     public const int SendRecordedPlayersUserName = 19;
     public const int SendRecordedNumberOfTurns = 20;
     public const int SendRecordedGamesStartingSymbol = 21;
@@ -713,7 +760,7 @@ public class ReplayRecorder
         string timeSerialized = "";
         foreach (float time in timeBetweenTurnsArray)
         {
-            timeSerialized += ',' + time;
+            timeSerialized += "," + time;
         }
         return timeSerialized;
     }
@@ -723,7 +770,7 @@ public class ReplayRecorder
         string moveIndexSerialized = "";
         foreach (int index in cellNumberOfTurn)
         {
-            moveIndexSerialized += ',' + index;
+            moveIndexSerialized += "," + index;
         }
         return moveIndexSerialized;
     }

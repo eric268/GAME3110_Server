@@ -74,14 +74,14 @@ public class NetworkedServer : MonoBehaviour
         }
 
     }
-  
+
     public void SendMessageToClient(string msg, int id)
     {
         byte error = 0;
         byte[] buffer = Encoding.Unicode.GetBytes(msg);
         NetworkTransport.Send(hostID, id, reliableChannelID, buffer, msg.Length * sizeof(char), out error);
     }
-    
+
     private void ProcessRecievedMsg(string msg, int id)
     {
         Debug.Log("msg received = " + msg + ".  connection id = " + id);
@@ -102,7 +102,7 @@ public class NetworkedServer : MonoBehaviour
             string p = csv[2];
 
             bool isUnique = true;
-            foreach(PlayerAccount pa in accountInfo)
+            foreach (PlayerAccount pa in accountInfo)
             {
                 if (pa.userName == n)
                 {
@@ -117,7 +117,7 @@ public class NetworkedServer : MonoBehaviour
             }
             else
             {
-                accountInfo.AddLast(new PlayerAccount(n, p,0));
+                accountInfo.AddLast(new PlayerAccount(n, p, 0));
                 SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success + "," + n, id);
                 SavePlayerAccounts();
             }
@@ -127,12 +127,12 @@ public class NetworkedServer : MonoBehaviour
             string n = csv[1];
             string p = csv[2];
             bool hasBeenFound = false;
-           
+
             foreach (PlayerAccount pa in accountInfo)
             {
                 if (pa.userName == n)
                 {
-                    if(pa.password == p)
+                    if (pa.password == p)
                     {
                         SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.Success + "," + n, id);
                         return;
@@ -147,7 +147,7 @@ public class NetworkedServer : MonoBehaviour
             }
             if (!hasBeenFound)
                 SendMessageToClient(ServertoClientSignifiers.LoginResponse + "," + LoginResponse.FailureNameNotFound, id);
-            }
+        }
         else if (signifier == ClientToSeverSignifiers.AddToGameSessionQueue)
         {
             if (playerWaitingForMatch == -1)
@@ -167,7 +167,7 @@ public class NetworkedServer : MonoBehaviour
                 int playerWaitingForMatchMovesFirst = Random.Range(0, 2);
                 int currentPlayersMove = (playerWaitingForMatchMovesFirst == 1) ? 0 : 1;
 
-                SendMessageToClient(string.Join(",",ServertoClientSignifiers.GameSessionStarted.ToString(), playerWaitingForMatchSymbol, playerWaitingForMatchMovesFirst, gameRoomID.ToString()), playerWaitingForMatch);
+                SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionStarted.ToString(), playerWaitingForMatchSymbol, playerWaitingForMatchMovesFirst, gameRoomID.ToString()), playerWaitingForMatch);
                 SendMessageToClient(string.Join(",", ServertoClientSignifiers.GameSessionStarted, currentPlayersSymbol, currentPlayersMove, gameRoomID.ToString()) + "", id);
 
                 playerWaitingForMatch = -1;
@@ -219,7 +219,7 @@ public class NetworkedServer : MonoBehaviour
             {
                 SendMessageToClient(ServertoClientSignifiers.OpponentWon.ToString() + "," + csv[1], gs.playerID1);
             }
-            foreach(PlayerAccount p in accountInfo)
+            foreach (PlayerAccount p in accountInfo)
             {
                 if (p.userName == csv[1])
                 {
@@ -259,7 +259,7 @@ public class NetworkedServer : MonoBehaviour
             IEnumerable<PlayerAccount> sortedAccountInfo = accountInfo.OrderByDescending(item => item.totalNumberOfWins);
 
             int playersOnLeaderboardSignifier = (sortedAccountInfo.Count() >= 10) ? 10 : sortedAccountInfo.Count();
-            string streamOfPlayersOnLeaderboard =  "," + playersOnLeaderboardSignifier.ToString();
+            string streamOfPlayersOnLeaderboard = "," + playersOnLeaderboardSignifier.ToString();
             foreach (PlayerAccount p in sortedAccountInfo)
             {
                 streamOfPlayersOnLeaderboard += ("," + p.userName + "," + p.totalNumberOfWins);
@@ -295,7 +295,7 @@ public class NetworkedServer : MonoBehaviour
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID1);
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), gs.playerID2);
 
-                    foreach(int observerNum in gs.observerIDs)
+                    foreach (int observerNum in gs.observerIDs)
                     {
                         if (observerNum != id)
                             SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), csv[1], csv[2]), observerNum);
@@ -404,7 +404,7 @@ public class NetworkedServer : MonoBehaviour
         {
             StreamReader sr = new StreamReader(path);
             string line = "";
-            while((line = sr.ReadLine()) != null)
+            while ((line = sr.ReadLine()) != null)
             {
                 string[] arr = line.Split(',');
                 int saveDataIdentifyer = int.Parse(arr[0]);
@@ -440,7 +440,7 @@ public class NetworkedServer : MonoBehaviour
     {
         foreach (GameSession gs in gameSessionManager.allGameSessions)
         {
-            foreach(int observerID in gs.observerIDs)
+            foreach (int observerID in gs.observerIDs)
             {
                 if (observerID == id)
                     return gs;
@@ -493,7 +493,7 @@ public class NetworkedServer : MonoBehaviour
             {
                 string[] csv = line.Split(',');
 
-                    replayManager.Add(line);   
+                replayManager.Add(line);
             }
             sr.Close();
         }
@@ -544,7 +544,7 @@ public class NetworkedServer : MonoBehaviour
                 if (observerNum != id)
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), observerNum);
             }
-            
+
 
 
             if (!gs.player1InRoom && !gs.player2InRoom)
@@ -562,7 +562,7 @@ public class PlayerAccount
         password = p;
         totalNumberOfWins = totalWins;
     }
-    static public bool operator==(PlayerAccount p1, PlayerAccount p2)
+    static public bool operator ==(PlayerAccount p1, PlayerAccount p2)
     {
         return (p1.userName == p2.userName && p1.password == p2.password);
     }
@@ -661,7 +661,7 @@ public class GameSessionManager
         return nextGameSessionIDNumber;
     }
     public List<GameSession> allGameSessions;
-    public GameSessionManager() 
+    public GameSessionManager()
     {
         allGameSessions = new List<GameSession>();
     }

@@ -7,6 +7,14 @@ using System.IO;
 using System.Linq;
 using UnityEngine.UI;
 
+public enum RecordingSearchCriteria
+{ 
+    INCLUDE_ONLY_USER,
+    EXCLUDE_USER,
+    INCLUDE_ALL,
+}
+
+
 public class NetworkedServer : MonoBehaviour
 {
     int maxConnections = 1000;
@@ -43,7 +51,7 @@ public class NetworkedServer : MonoBehaviour
         currentReplay = new ReplayRecorder();
         
         LoadPlayerAccounts();
-        LoadAllRecordings();
+        replayManager = LoadRecordingsWithFiltering(RecordingSearchCriteria.INCLUDE_ALL);
     }
 
     // Update is called once per frame
@@ -334,13 +342,13 @@ public class NetworkedServer : MonoBehaviour
         else if (signifier == ClientToSeverSignifiers.RequestNumberOfSavedRecordings)
         {
             string userName = csv[1];
-            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordings(userName).Count), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordingsWithFiltering(RecordingSearchCriteria.INCLUDE_ONLY_USER, userName).Count), id);
         }
         else if (signifier == ClientToSeverSignifiers.ClearRecordingOnServer)
         {
             string userName = csv[1];
             DeleteRecordingsBelongingToUser(userName);
-            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), LoadRecordings(userName).Count), id);
+            SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendNumberOfSavedRecordings.ToString(), 0), id);
         }
         else if (signifier == ClientToSeverSignifiers.PlayerLeftGameRoom)
         {
@@ -423,7 +431,7 @@ public class NetworkedServer : MonoBehaviour
         {
             string userName = csv[1];
             int recordingNumber = int.Parse(csv[2]);
-            string recordingInfo = LoadRecordings(userName)[recordingNumber];
+            string recordingInfo = LoadRecordingsWithFiltering(RecordingSearchCriteria.INCLUDE_ONLY_USER, userName)[recordingNumber];
 
             currentReplay = DeserializeReplayRecording(recordingInfo);
             SendMessageToClient(string.Join(",", ServertoClientSignifiers.RecordingStartingToBeSentToClient.ToString()), id);
@@ -464,8 +472,10 @@ public class NetworkedServer : MonoBehaviour
         {
             sw.WriteLine(PlayerAccountIdentifyer + "," + player.userName + "," + player.password + "," + player.totalNumberOfWins);
         }
+        
         sw.Close();
     }
+
     private GameSession FindGameSessionWithPlayerID(int id)
     {
         foreach (GameSession gs in gameSessionManager.allGameSessions)
@@ -475,6 +485,7 @@ public class NetworkedServer : MonoBehaviour
         }
         return null;
     }
+
     private GameSession FindGameSessionWithObserverID(int id)
     {
         foreach (GameSession gs in gameSessionManager.allGameSessions)
@@ -488,7 +499,6 @@ public class NetworkedServer : MonoBehaviour
         return null;
     }
 
-
     public void SaveRecordings()
     {
         StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + recordingFileName);
@@ -499,9 +509,10 @@ public class NetworkedServer : MonoBehaviour
         }
         sw.Close();
     }
-    public static List<string> LoadRecordings(string userName)
+
+    public List<string> LoadRecordingsWithFiltering(RecordingSearchCriteria searchCriteria, string userNameToFilter = "")
     {
-        List<string> playerReplayManager = new List<string>();
+        List<string> recordings = new List<string>();
         string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
         if (File.Exists(path))
         {
@@ -510,58 +521,35 @@ public class NetworkedServer : MonoBehaviour
             while ((line = sr.ReadLine()) != null)
             {
                 string[] csv = line.Split(',');
-                if (csv[0] == userName)
+
+                if (searchCriteria == RecordingSearchCriteria.INCLUDE_ALL)
                 {
-                    playerReplayManager.Add(line);
-                    Debug.Log("Loaded Recording: " + line);
+                    recordings.Add(line);
+                }
+                else if (searchCriteria == RecordingSearchCriteria.INCLUDE_ONLY_USER)
+                {
+                    if (csv[0] == userNameToFilter)
+                        recordings.Add(line);
+                }
+                else if (searchCriteria == RecordingSearchCriteria.EXCLUDE_USER)
+                {
+                    if (csv[0] != userNameToFilter)
+                        recordings.Add(line);
                 }
             }
             sr.Close();
         }
-        return playerReplayManager;
-    }
-
-    public void LoadAllRecordings()
-    {
-        string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
-        if (File.Exists(path))
-        {
-            StreamReader sr = new StreamReader(path);
-            string line = "";
-            while ((line = sr.ReadLine()) != null)
-            {
-                string[] csv = line.Split(',');
-
-                replayManager.Add(line);
-            }
-            sr.Close();
-        }
+        return recordings;
     }
 
     public void DeleteRecordingsBelongingToUser(string userName)
     {
-        List<string> recordingsToNotDelete = new List<string>();
-        string path = Application.dataPath + Path.DirectorySeparatorChar + recordingFileName;
-        if (File.Exists(path))
-        {
-            StreamReader sr = new StreamReader(path);
-            string line = "";
-            while ((line = sr.ReadLine()) != null)
-            {
-                string[] csv = line.Split(',');
-                if (csv[0] != userName)
-                {
-                    recordingsToNotDelete.Add(line);
-                }
-                replayManager.Add(line);
-            }
-            replayManager.Clear();
-            replayManager = recordingsToNotDelete;
-            sr.Close();
-            SaveRecordings();
-
-        }
+        List<string> recordingsToNotDelete = LoadRecordingsWithFiltering(RecordingSearchCriteria.EXCLUDE_USER, userName);
+        replayManager.Clear();
+        replayManager = recordingsToNotDelete;
+        SaveRecordings();
     }
+
     void PlayerDisconnectedFromGameSession(int id)
     {
         GameSession gs = FindGameSessionWithPlayerID(id);
@@ -583,8 +571,6 @@ public class NetworkedServer : MonoBehaviour
                 if (observerNum != id)
                     SendMessageToClient(string.Join(",", ServertoClientSignifiers.SendPlayerChatToOpponent.ToString(), sender, message), observerNum);
             }
-
-
 
             if (!gs.player1InRoom && !gs.player2InRoom)
                 gameSessionManager.allGameSessions.Remove(gs);
